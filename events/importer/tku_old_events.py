@@ -885,10 +885,13 @@ class TurkuOriginalImporter(Importer):
 
         event_list = sorted(events.values(), key=lambda x: x['end_time'])
 
-        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku')
-        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=set_deleted_false)
-        #qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
-        #self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted, check_deleted_func=check_deleted)
+        #This set all deleted event's 'deleted' -fields values from True to False if time window is relevant
+        #qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku')
+        #self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=set_deleted_false)
+        
+        #Normal usage (if event is deleted this is not checked in)
+        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
+        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted, check_deleted_func=check_deleted)
         
 
         for event in event_list:
@@ -904,7 +907,7 @@ class TurkuOriginalImporter(Importer):
         try:
 
             #This calls child element save funktion
-            print("calls child element save funktioncalls child element save funktioncalls child element save funktioncalls child element save funktioncalls child element save funktioncalls child element save funktion")
+            print("Calls child element save funktion.")
             self.saveChildElement(url, lang)
         except APIBrokenError:
             return
@@ -913,12 +916,8 @@ class TurkuOriginalImporter(Importer):
         logger.info("%d events processed" % len(events.values()))
 
         '''    
-        print('LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLapsetkin ajettu sisää!!!!!!!!!!')
-        print('-Huom! tuntematon tpr:unit, joita esiintyy taajaa kaataa ohjelman. Lisää Try lohko ja lokikirjoitus!-') 
-        print('----------------------------------- SE ON LOPPU NYT!!!-----------------------------------------------')
-        print('----------Tarkista taulut : Event, Keyword, DataSource, Place, License, Image------------------------')
-        print('----------Tarkista välitaulut taulut : eventlink, Event-in-Language, Event-Keyword, Event-License,---')
-        print('----------Tarkista taulujen viiteavaimet Event_Place_id  Image_License id jne...---------------------')
-        print('----------kirjoita logitiedostoon jos lädeaineistossa virheitä tai puutteita ym. moderoitavaa--------')
-        print('----------poista debugaus ja työ kommentit ja kommentoi koodi ja lisää ajoohjeet---------------------')     
+        print('-------Note! if unknown tpr:unit the event has not saved and that error is written to info logger!-') 
+        print('----------Chek table: Event: Keyword, DataSource, Place, License, Image------------------------')
+        print('----------Chek midle tables: eventlink, Event-in-Language, Event-Keyword, Event-License,-------')
+        print('----------Chek tables foreingkeys: Event_Place_id  Image_License id jne...---------------------')        
         '''
