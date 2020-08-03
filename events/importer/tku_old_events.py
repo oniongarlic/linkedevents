@@ -164,6 +164,11 @@ def check_deleted(obj):
         return True
     return False
 
+def set_deleted_false(obj):
+    obj.deleted = False
+    obj.save(update_fields=['deleted'])
+    return True
+
 class APIBrokenError(Exception):
     pass
 
@@ -339,6 +344,7 @@ class TurkuOriginalImporter(Importer):
                 event_Mother1.start_time = self.dt_parse(self.timeToTimestamp(str(eventTku['start_date'])))
                 event_Mother1.end_time = self.dt_parse(self.timeToTimestamp(str(eventTku['end_date'])))
                 event_Mother1.super_event_id = usableSuperEventId
+                event_Mother1.deleted = False
 
                 orig_id = str(event_Mother1.id)
 
@@ -413,6 +419,8 @@ class TurkuOriginalImporter(Importer):
             eventItem['publisher'] = self.organization
             eventItem['end_time'] = end_time
 
+             #eventItem['deleted'] = False
+
             event_categories = eventItem.get('event_categories', set())
 
             if event_categories:
@@ -436,7 +444,12 @@ class TurkuOriginalImporter(Importer):
                 "en": eventTku['lead_paragraph_markup_en']
             }
 
-            location_extra_info = str(eventTku['address_extension']) + ', ' + str(eventTku['city_district']) + ', ' + str(eventTku['place'])
+           
+            #location_extra_info = str(eventTku['address_extension']) + ', ' + str(eventTku['city_district']) + ', ' + str(eventTku['place'])
+            location_extra_info = str(eventTku['address_extension'])
+
+            if len(location_extra_info) > 400:
+                location_extra_info =location_extra_info[400]
 
             eventItem['location_extra_info'] = {
                 "fi": location_extra_info,
@@ -582,7 +595,7 @@ class TurkuOriginalImporter(Importer):
                 if node_type == 'Virtual events':
                 
                     # If the event is a virtual event, it is classified as  id virtual:public
-                    eventItem ['location']['id'] = VIRTUAL_LOCATION_ID                                  
+                    eventItem['location']['id'] = VIRTUAL_LOCATION_ID                                  
                 elif str(eventTku['palvelukanava_code']) != '':
 
                     tprNo = str(eventTku['palvelukanava_code'])    
@@ -604,7 +617,7 @@ class TurkuOriginalImporter(Importer):
                                 return
                               
                               # If not any error, the number of palvelukanava_code is used 
-                            eventItem ['location']['id'] = ('tpr:' + tprNo)
+                            eventItem['location']['id'] = ('tpr:' + tprNo)
                             print('eventItem: ' + tprNo)
                         
                     except:
@@ -721,7 +734,7 @@ class TurkuOriginalImporter(Importer):
                             event_place_id = event_address_data
 
                             
-                            eventItem ['location']['id'] = event_place_id
+                            eventItem['location']['id'] = event_place_id
 
                         else:
                             logger.warning("No match found for place '%s' (event %s, %s)" % (eventTku['address'],
@@ -872,9 +885,10 @@ class TurkuOriginalImporter(Importer):
 
         event_list = sorted(events.values(), key=lambda x: x['end_time'])
 
-        #qs = Event.objects.filter(end_time__gte=datetime.now(), self.data_source, deleted=False)
-        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
-        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted)
+        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku')
+        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=set_deleted_false)
+        #qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
+        #self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted, check_deleted_func=check_deleted)
         
 
         for event in event_list:
