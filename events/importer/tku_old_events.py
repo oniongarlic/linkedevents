@@ -464,8 +464,14 @@ class TurkuOriginalImporter(Importer):
             
             
             #Because these are motherevents, so we type them as "umbrella"
-            eventItem['super_event_type'] = Event.SuperEventType.UMBRELLA
+
+            if eventTku['event_type'] != 'Single event' and eventTku['drupal_nid_super'] == '':
+                
+                eventItem['super_event_type'] = Event.SuperEventType.UMBRELLA
             
+            else:
+            
+                eventItem['super_event_type'] = None
             
             event_image_ext_url = ''
             image_license = ''
