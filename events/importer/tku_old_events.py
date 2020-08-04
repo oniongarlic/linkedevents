@@ -442,8 +442,13 @@ class TurkuOriginalImporter(Importer):
                 "fi": eventTku['lead_paragraph_markup_fi'],
                 "sv": eventTku['lead_paragraph_markup_sv'],
                 "en": eventTku['lead_paragraph_markup_en']
-            }
+            }          
 
+            eventItem['provider'] = {
+                "fi": 'Turku',
+                "sv": 'Åbo',
+                "en": 'Turku'
+            }
            
             #location_extra_info = str(eventTku['address_extension']) + ', ' + str(eventTku['city_district']) + ', ' + str(eventTku['place'])
             location_extra_info = str(eventTku['address_extension'])
