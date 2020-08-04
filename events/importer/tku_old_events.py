@@ -7,7 +7,6 @@ import time
 import pytz
 import bleach
 
-
 from datetime import datetime, timedelta
 from django.utils.html import strip_tags 
 from events.models import Event, Keyword, DataSource, Place, License, Image, Language
@@ -21,7 +20,7 @@ from .base import Importer, register_importer, recur_dict
 from .yso import KEYWORDS_TO_ADD_TO_AUDIENCE
 
 #Run comand: python manage.py event_import tku_old_events --events
-print('Run comand: python manage.py event_import tku_old_events --events')
+#print('XXXXXXXX Run comand: python manage.py event_import tku_old_events --events')
 
 # Per module logger
 logger = logging.getLogger(__name__)
@@ -105,7 +104,7 @@ TURKU_AUDIENCES_KEYWORD_IDS = {
 }
 
 #Where our Drupal YSO category is linked to in our Turku version.
-TURKU_DRUPAL_EVENTS_EN_YSOID = {   
+TURKU_DRUPAL_CATEGORY_EN_YSOID = {   
     'Exhibits': 'yso:p5121', #utställningar #Näyttelyt 
     'Festival and major events': 'yso:p1304',	# festivaler #Festivaalit ja suurtapahtumat (http://www.yso.fi/onto/yso/p1304)
 	'Meetings and congress ': 'yso:p7500',#möten, symposier (sv), kongresser (sv), sammanträden (sv) #Kokoukset (http://www.yso.fi/onto/yso/p38203)
@@ -121,7 +120,7 @@ TURKU_DRUPAL_EVENTS_EN_YSOID = {
 	'Sports':'yso:p965',#Urheilu,idrott, http://www.yso.fi/onto/yso/p965
 	'Christmas':'yso:p419',#Joulu,julen, http://www.yso.fi/onto/yso/p419	
 	'Literature':'yso:p8113', #Kirjallisuus, litteratur (sv), http://www.yso.fi/onto/yso/p8113
-    'Others':'yso:10727', #Ulkopelit,(-ei ysoa, ei kategoriaa)	
+    'Others':'yso:p10727', #Ulkopelit,(-ei ysoa, ei kategoriaa)	
 }
 #Where our Drupal YSO audience category is linked to in our Turku version.
 TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID = {
@@ -238,6 +237,7 @@ class TurkuOriginalImporter(Importer):
             yso_data_source = DataSource.objects.get(id='yso')
         except DataSource.DoesNotExist:
             yso_data_source = None
+
 
         if yso_data_source:
             # Build a cached list of YSO keywords
@@ -508,8 +508,7 @@ class TurkuOriginalImporter(Importer):
             
 
            # Because our Drupal json of Turku old events has not included any field to event_in_language, we set "fi" as default based on info from old Turku events
-            event_keywords = eventItem.get('keywords', set())
-            event_audience = eventItem.get('audience', set())
+                   
             
             event_in_language = eventItem.get('in_language', set())
             try:
@@ -522,67 +521,123 @@ class TurkuOriginalImporter(Importer):
            
            # Also, the current language is always included
             eventItem['in_language'] = event_in_language
+
+            #Here we separate all new main audience words from Drupal audience fields anf add them to the keyword list
+            print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') 
             
-           
+            event_keywords = eventItem.get('keywords', set())
+
+            print('eventTku event_categories:', eventTku['event_categories'])
             #Here we separate all new Turku main category words from Drupal category fields and add them to the keyword list 
             if eventTku['event_categories'] != None:
-                for name in eventTku['event_categories']:
 
-                    if name in TURKU_DRUPAL_EVENTS_EN_YSOID.keys():
-                        ysoId = str(TURKU_DRUPAL_EVENTS_EN_YSOID[name].values())
-                        #yso = TURKU_KEYWORD_IDS[name]
-                        if isinstance(ysoId, tuple):
+                eventTku['event_categories'] =eventTku['event_categories'] + ','
 
-                            event_keywords.add(self.yso_by_id['yso:' + ysoId])
+                categories = eventTku['event_categories'].split(',')
 
-                        else:
-                            event_audience.add(self.yso_by_id['yso:' + ysoId])        
+                for name in categories:
+
+                    print('CCCCCCC eventTku target_audience param:' + name)
+
+                    if name in TURKU_DRUPAL_CATEGORY_EN_YSOID.keys():
+                        
+                        ysoId = TURKU_DRUPAL_CATEGORY_EN_YSOID[name]
+
+                        print('CCCCCCC ysoId: ' + ysoId)                      
+                        event_keywords.add(Keyword.objects.get(id= ysoId))
 
             
-            #Here we separate all new main audience words from Drupal audience fields anf add them to the keyword list
+            if eventTku['keywords'] != None:
+
+                eventTku['keywords'] =eventTku['keywords'] + ','
+
+                keywords = eventTku['keywords'].split(',')
+
+                for name in keywords:
+
+                    print('KKKKKKK eventTku keywords param:' + name)
+
+                    if name not in TURKU_DRUPAL_CATEGORY_EN_YSOID.keys():
+
+
+                        print('KKKKKKK ysoId: ' + name)      
+
+                        try:                
+                        
+                            event_keywords.add(Keyword.objects.get(name = name))
+
+                        except:
+
+                            print('Warning!' + ' keywords not found:' + name)
+                            logger.warning('Moderator should add the following keywords ' + name)    
+                            pass    
+            
+            
+            
+            eventItem['keywords'] = event_keywords
+
+            
+            event_audience = eventItem.get('audience', set())
+
+            print('eventTku target_audience:', eventTku['target_audience'])    
             
             if eventTku['target_audience'] != None:
-                for name in eventTku['target_audience']:
+                
+                eventTku['target_audience'] =eventTku['target_audience'] + ','
+
+                audience = eventTku['target_audience'].split(',')
+                for name in audience:
+
+                    print('AAAAAAA eventTku target_audience param:' + name)
 
                     if name in TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID.keys():
-                        ysoId = str(TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID[name].values())
-                        #yso = TURKU_KEYWORD_IDS[name]
-                        if isinstance(ysoId, tuple):
 
-                            event_keywords.add(self.yso_by_id['yso:' + ysoId])
+                        ysoId = TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID[name]
 
-                        else:
-                            event_audience.add(self.yso_by_id['yso:' + ysoId])        
+                        print('AAAAAAA ysoId: ' + ysoId)   
 
-
+                        event_audience.add(Keyword.objects.get(id= ysoId))       
+           
+            eventItem['audience'] = event_audience
     
             # Here we get all keywords for the event from Drupal json interface, then we check if they exit in the yso dictionary and finally, we add them to the event_keywords 
             # using the command: event_keywords.add
             # Not all the replacements are valid keywords. yso has some data quality issues
-            
+           
+            '''
             if eventTku['keywords'] != None:
                 
-                old_name = str(eventTku['keywords'])
-                try:
-                    old_keyword = Keyword.objects.get(old_name)
+                old_name = eventTku['keywords']
 
-                    self.old_keys = {x.id: x for x in old_keyword}
-
-                    for x in old_keyword:
-                        event_keywords.add(self.old_keys[x.id])
-
-                    eventItem['keywords'] = event_keywords
-                    logger.info('Keywords: ' + event_keywords)
-
+                yso_data_source = DataSource.objects.get(id='yso')
+               
+                ysoKey = Keyword.objects.filter(data_source=yso_data_source)
                 
-                except:
-                    print('Warning!' + ' keywords not found:' + eventTku['keywords'])
-                    logger.warning('Moderator should add the following keywords ' + eventTku['keywords'])    
-                    pass    
+                #old_keyword = Keyword.objects.get(old_name)
+                
+                #self.old_keys = {x.id: x for x in ysoKey}
 
-         
-                    
+                for x in old_name:
+                                        
+                    keyName = {n.name: n for n in ysoKey}                                   
 
+                    if x in keyName.values():
+
+                        y = Keyword.objects.filter(name=x)
+                        
+                        event_keywords.add(y.id)
+
+                        logger.info('Keywords: ' + event_keywords)
+
+                    else:
+                                    
+                        print('Warning!' + ' keywords not found:' + x)
+                        logger.warning('Moderator should add the following keywords ' + x)    
+                        pass    
+
+                eventItem['keywords'] = event_keywords    
+            '''
+            
  
             #Here we seach events_place based on the unit number of the place in Palvelukartta-map 
             # One of the type 7 nodes (either Tapahtumat, or just the library name)

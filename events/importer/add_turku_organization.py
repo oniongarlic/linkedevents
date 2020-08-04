@@ -19,11 +19,14 @@ logger = logging.getLogger(__name__)
 #this includes Virtual organizations and organizations classes and one virtual lacation (virtual:public)
 #this also includes the city of Turku specifig organizations and data sources
 
+#print('Run comand: python manage.py event_import add_turku_organization')
+
 @register_importer
 class OrganizationImporter(Importer):
     name = 'add_turku_organization'
     supported_languages = ['fi', 'sv']
 
+    
     def setup(self):
         #system data source
 
@@ -133,7 +136,7 @@ class OrganizationImporter(Importer):
         #data source for city of Turku 
         ds_args2 = dict(id='turku', user_editable=True)
         defaults2 = dict(name='Kuntakohtainen data Turun Kaupunki')
-        self.data_source, _ = DataSource.objects.get_or_create(defaults=defaults2, **ds_args2)
+        self.data_source_tku, _ = DataSource.objects.get_or_create(defaults=defaults2, **ds_args2)
         
         #organisation for city of Turku (check the city/munisipality number)
         org_args2 = dict(origin_id='853', data_source=self.data_source, classification_id="org:3")
@@ -148,12 +151,12 @@ class OrganizationImporter(Importer):
         #private users data source (this includes also city of Turku specifig organization)
         ds_args3 = dict(id='yksilo', user_editable=True)
         defaults3 = dict(name='Yksityishenkilöihin liittyvä yleisdata')
-        self.data_source, _ = DataSource.objects.get_or_create(defaults=defaults3, **ds_args3)
+        self.data_source_yksilo, _ = DataSource.objects.get_or_create(defaults=defaults3, **ds_args3)
         
         #private users public organisations (this includes also city of Turku specifig organization)
         org_args3 = dict(origin_id='2000', data_source=self.data_source, classification_id="org:11")
         defaults3 = dict(name='Yksityishenkilöt')        
-        self.organization, _ = Organization.objects.get_or_create(defaults=defaults3, **org_args3)
+        self.organization_yks, _ = Organization.objects.get_or_create(defaults=defaults3, **org_args3)
         
             #Virtual events
 
