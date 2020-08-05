@@ -197,7 +197,7 @@ class TurkuOriginalImporter(Importer):
         defaults = dict(name='Kunta')
         self.organizationclass, _ =  OrganizationClass.objects.get_or_create(defaults=defaults, **ds_args)
 
-        org_args = dict(origin_id='853', data_source=self.org_data_source, classification_id="org:3")
+        org_args = dict(origin_id='853', data_source=self.data_source, classification_id="org:3")
         defaults = dict(name='Turku')
         self.organization, _ = Organization.objects.get_or_create(defaults=defaults, **org_args)
 
