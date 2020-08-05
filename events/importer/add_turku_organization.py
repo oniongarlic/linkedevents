@@ -139,7 +139,7 @@ class OrganizationImporter(Importer):
         self.data_source_tku, _ = DataSource.objects.get_or_create(defaults=defaults2, **ds_args2)
         
         #organisation for city of Turku (check the city/munisipality number)
-        org_args2 = dict(origin_id='853', data_source=self.data_source, classification_id="org:3")
+        org_args2 = dict(origin_id='853', data_source=self.data_source_tku, classification_id="org:3")
         defaults2 = dict(name='Turku')        
         self.organization, _ = Organization.objects.get_or_create(defaults=defaults2, **org_args2)
         
