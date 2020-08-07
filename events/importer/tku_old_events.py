@@ -142,7 +142,7 @@ TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID = {
 LANGUAGES_TURKU_OLD =  ['fi', 'sv' , 'en']
 
 
-CITY_LIST = ['turku',]# ['turku', 'kaarina', 'lieto', 'raisio']
+CITY_LIST = ['turku', 'naantali', 'raisio', 'nousiainen', 'mynämäki', 'masku', 'aura', 'marttila', 'kaarina', 'lieto', 'paimio', 'sauvo'] 
 
 #Our timezone for database.
 LOCAL_TZ = timezone('Europe/Helsinki')
@@ -159,7 +159,22 @@ def mark_deleted(obj):
 
 def check_deleted(obj):
     # We don't want to delete past events, so as far as the importer cares, they are considered deleted
-    if obj.deleted or obj.end_time < datetime.now(pytz.utc):
+    
+   
+    d =  datetime.now()
+    tz = pytz.timezone('Europe/Helsinki')
+    tl = tz.localize(d)  
+
+    #print('TTTTTTTTTTTTTTTTTTTT endtime -  ', obj.end_time, '   now - ' + datetime.now().strftime("%Y-%m-%d-%H:%M:%S"))
+    #print('TTTTTTTTTTTTTTTTTTTT endtime -  ', obj.end_time, '   now -' ,datetime.now().replace(microsecond=0))
+    #print('TTTTTTTTTTTTTTTTTTTT endtime -  ', obj.end_time, '   now -' ,tl)
+    '''
+    if obj.end_time < tl:
+        print("------------------------ Obj endtime is smaller than now")
+    else:
+        print("------------------------ Obj endtime is bigger than now")
+    '''
+    if obj.deleted or obj.end_time < tl:
         return True
     return False
 
@@ -296,19 +311,26 @@ class TurkuOriginalImporter(Importer):
         return str(dt_object)
 
 
-    def _import_child_event(self, lang, eventTku):
+    def _import_child_event(self, lang, eventTku, eventImageUrl):
              
         event_Mother = None
+        event_Image = None
         event_Recurring = None
 
         #Linked Events event id type is source:origin_id like turku:234234
         sourceEventSuperId = eventTku['drupal_nid_super']
         sourceEventId = eventTku['drupal_nid']
+        sourceEventImageUrl = eventImageUrl
+        sourceEventLang = 'fi'
+        sourceEventLinkWeb = eventTku['website_url']
+        sourceEventLinkFace = eventTku['facebook_url']
+        sourceEventLinkTwit = eventTku['twitter_url']
         superId= (self.data_source.id + ':' + sourceEventSuperId)
         sourceId = (self.data_source.id + ':' + sourceEventId)      
       
         try:
             event_Mother = Event.objects.get(id=superId)
+            #event_Image = Image.objects.get(id=superId)
         except:
             logger.info('No motherevent found for child event who finds  its own super event No.' + superId)
             return
@@ -333,14 +355,17 @@ class TurkuOriginalImporter(Importer):
             #create a new umbrella with new id and change old mother super_event_type to recurring
 
             #event_type 'umbrella' is level 1 event, 'recurring' is level 2 event and null is level 3 event (serie)
-            if event_Mother.super_event_type == Event.SuperEventType.UMBRELLA:
-         
+            #if event_Mother.super_event_type == Event.SuperEventType.UMBRELLA:
+                   
+            
+            if event_Mother.super_event_type == Event.SuperEventType.UMBRELLA: 
+
                 event_Mother1 = event_Mother
                 
-                
-
                 event_Mother1.id = event_Mother.id + 's'
+            
                 event_Mother1.super_event_type = Event.SuperEventType.RECURRING
+                event_Mother1.date_published = datetime.now()            
                 event_Mother1.start_time = self.dt_parse(self.timeToTimestamp(str(eventTku['start_date'])))
                 event_Mother1.end_time = self.dt_parse(self.timeToTimestamp(str(eventTku['end_date'])))
                 event_Mother1.super_event_id = usableSuperEventId
@@ -353,36 +378,67 @@ class TurkuOriginalImporter(Importer):
                 oid = orig_id[1]
 
                 event_Mother1.origin_id = oid                   
-     
-                
+
+                #event_Mother1.update(force_insert=True)
                 event_Mother1.save(force_insert=True)
-               
-            
-             #update old mother from umbrella to recurring type, set a new time fields as well as set super id and save it                
-               
-                
-                            
-            elif event_Mother.super_event_type == Event.SuperEventType.RECURRING:
+          
+            #update old mother from umbrella to recurring type, set a new time fields as well as set super id and save it                
+                     
+            if event_Mother.super_event_type == Event.SuperEventType.RECURRING:
                 #NOTE!change  mother's type to child's type from recurring to null, set a new time fields as well as set superid and save it 
-             
+
+                #fill also recurring element for old mother data
+  
+                #print("LLLLLLLLLLLLLLLLLLLLLLLLLL id", event_Mother.id) 
+                #print("LLLLLLLLLLLLLLLLLLLLLLLLLL pub",event_Mother.date_published)
+                
+                Event.objects.update_or_create(
+                    id = event_Mother.id,
+                    defaults = {
+                    'date_published' : datetime.now(),
+                    'provider': 'Turku',
+                    'provider_fi': 'Turku',
+                    'provider_sv': 'Åbo',
+                    'provider_en': 'Turku',
+                    'deleted': False} 
+                    )
+
+                
+
                 event_Mother2 = event_Mother
 
                 event_Mother2.id = sourceId + 'ss'
                 event_Mother2.super_event_type = None
+                event_Mother2.date_published = datetime.now()  
                 event_Mother2.start_time = self.dt_parse(self.timeToTimestamp(str(eventTku['start_date'])))
                 event_Mother2.end_time = self.dt_parse(self.timeToTimestamp(str(eventTku['end_date'])))
                 event_Mother2.super_event_id = usableSuperEventId
+                event_Mother2.deleted = False
 
                 orig_id = str(event_Mother2.id)
-
                 orig_id = orig_id.split(':')
-
                 oid = orig_id[1]
-
                 event_Mother2.origin_id = oid      
+                            
+
+                event_Mother2.save()
                
-                event_Mother.save()
+                #make child middletable marks for Event-in-Language (must be), eventlink, Event-Keyword, Event-License
                
+
+
+
+                Event_im    .objects.update_or_create(
+                    id = event_Mother.id,
+                    defaults = {
+                    'date_published' : datetime.now(),
+                    'provider': 'Turku',
+                    'provider_fi': 'Turku',
+                    'provider_sv': 'Åbo',
+                    'provider_en': 'Turku',
+                    'deleted': False} 
+                    )
+
 
     def _import_event(self, lang, event_el, events, event_image_url):
         
@@ -420,6 +476,7 @@ class TurkuOriginalImporter(Importer):
             eventItem['end_time'] = end_time
 
              #eventItem['deleted'] = False
+       
 
             event_categories = eventItem.get('event_categories', set())
 
@@ -511,7 +568,7 @@ class TurkuOriginalImporter(Importer):
                 # Publication date changed based on language version, so we make sure
                 # to save it only from the primary event.
             
-            eventItem['date_published'] = self.dt_parse(self.timeToTimestamp(str(eventTku['start_date'])))
+            eventItem['date_published'] = datetime.now()
             
             
             set_attr('start_time', self.dt_parse(self.timeToTimestamp(str(eventTku['start_date']))))
@@ -534,11 +591,11 @@ class TurkuOriginalImporter(Importer):
             eventItem['in_language'] = event_in_language
 
             #Here we separate all new main audience words from Drupal audience fields anf add them to the keyword list
-            print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') 
+            #print('XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX') 
             
             event_keywords = eventItem.get('keywords', set())
 
-            print('eventTku event_categories:', eventTku['event_categories'])
+            #print('eventTku event_categories:', eventTku['event_categories'])
             #Here we separate all new Turku main category words from Drupal category fields and add them to the keyword list 
             if eventTku['event_categories'] != None:
 
@@ -548,13 +605,13 @@ class TurkuOriginalImporter(Importer):
 
                 for name in categories:
 
-                    print('CCCCCCC eventTku target_audience param:' + name)
+                    #print('CCCCCCC eventTku target_audience param:' + name)
 
                     if name in TURKU_DRUPAL_CATEGORY_EN_YSOID.keys():
                         
                         ysoId = TURKU_DRUPAL_CATEGORY_EN_YSOID[name]
 
-                        print('CCCCCCC ysoId: ' + ysoId)                      
+                        #print('CCCCCCC ysoId: ' + ysoId)                      
                         event_keywords.add(Keyword.objects.get(id= ysoId))
 
             
@@ -566,12 +623,12 @@ class TurkuOriginalImporter(Importer):
 
                 for name in keywords:
 
-                    print('KKKKKKK eventTku keywords param:' + name)
+                    #print('KKKKKKK eventTku keywords param:' + name)
 
                     if name not in TURKU_DRUPAL_CATEGORY_EN_YSOID.keys():
 
 
-                        print('KKKKKKK ysoId: ' + name)      
+                        #print('KKKKKKK ysoId: ' + name)      
 
                         try:                
                         
@@ -590,7 +647,7 @@ class TurkuOriginalImporter(Importer):
             
             event_audience = eventItem.get('audience', set())
 
-            print('eventTku target_audience:', eventTku['target_audience'])    
+            #print('eventTku target_audience:', eventTku['target_audience'])    
             
             if eventTku['target_audience'] != None:
                 
@@ -599,13 +656,13 @@ class TurkuOriginalImporter(Importer):
                 audience = eventTku['target_audience'].split(',')
                 for name in audience:
 
-                    print('AAAAAAA eventTku target_audience param:' + name)
+                    #print('AAAAAAA eventTku target_audience param:' + name)
 
                     if name in TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID.keys():
 
                         ysoId = TURKU_DRUPAL_AUDIENCES_KEYWORD_EN_YSOID[name]
 
-                        print('AAAAAAA ysoId: ' + ysoId)   
+                        #print('AAAAAAA ysoId: ' + ysoId)   
 
                         event_audience.add(Keyword.objects.get(id= ysoId))       
            
@@ -701,7 +758,7 @@ class TurkuOriginalImporter(Importer):
                     if eventTku['address'] != None:
                         event_address = str(eventTku['address'])
                         
-                        
+                        #print('AAAAAAAAAAAAAAA event_address: ' + event_address) 
                         #If turku is missing, we add turku
                         cityList = CITY_LIST
 
@@ -709,105 +766,111 @@ class TurkuOriginalImporter(Importer):
                         # get rid of letters after street number
                         event_address = re.sub(r'([0-9])\s?[a-z](-[a-z])?$', r'\1', event_address.lower())
 
+                        #if 'turku' in event_address: 
 
+                        if ')' in event_address:
+                            event_address = event_address.split(')')
+                            event_address = event_address[1]
+                        
+                        if ',' not in event_address:
+                            event_address = event_address + ', turku'
 
-                        if 'turku' in event_address: 
+                        event_address = event_address.split(',')
 
-                            if ')' in event_address:
-                                event_address = event_address.split(')')
-                                event_address = event_address[1]
+                        
+                            #If city/municipality is missing, we add turku
+                        
+                        cityFound = False
+
+                        isAddressFound = False
+
+                        
+                        for i in cityList:
                             
-                            if ('turku' not in event_address) and (',' not in event_address):
-                                event_address = event_address + ', turku'
+                            if i in event_address[1]:
+                                cityFound =True
+                        
+                        if not cityFound:
+                            event_address[1] = event_address[1] + 'turku'         
 
-                            event_address = event_address.split(',')
 
-                           
-                             #If city/municipality is missing, we add turku
+
+                        lastLeterOffirstPart = event_address[0][-1:]
+                        
+                        #Here we check if street number is missing 
+                        # If it is missing, we add 1
+                        if not lastLeterOffirstPart.isdigit():
+                            event_address[0] = event_address[0] + ' 1' 
+
+                        #If Turku region postalcode (20xxx or 21xxxx) is found in address, it must be dropped out (space + 5 numbers = 6 char)
+                        if " 2" in event_address[1]:
+                            event_address[1] = event_address[1][6:]
+
+                        event_address_data = event_address[0] + event_address[1]
+                        event_address_data = event_address_data.replace(' ', '_')            
+                        event_address_data = event_address_data.replace('k.', 'katu')
+
+                        if event_address_data[0] == '_':
+                            event_address_data = event_address_data[1:]
+
+                    
+
+                        #itäinen_pitkäkatu_64_a_1_turku
+                    
+                    
+                        #Check the locality of the address (turku)
+
+
+                        addressIdParts = event_address_data.split('_')
+                        addressId = 'osoite:'
+                        
+
+                        for p in addressIdParts: 
                             
-                            cityFound = False
+                            place_id = None
 
-                            for i in cityList:
-                                
-                                if i in event_address[1]:
-                                    cityFound =True
+                            addressId = (addressId + p) 
+
+                        
+                                            
+                            try:
+
+                                place_id = Place.objects.get(id=addressId+"_turku")
                             
-                            if not cityFound:
-                                event_address[1] = event_address[1] + 'turku'         
-
-
-                            lastLeterOffirstPart = event_address[0][-1:]
+                            except:
+                                #NOTE! Save this in log file 
+                                logger.info('No matchs for address: ')
                             
-                            #Here we check if street number is missing 
-                            # If it is missing, we add 1
-                            if not lastLeterOffirstPart.isdigit():
-                                event_address[0] = event_address[0] + ' 1' 
 
-                            #If Turku region postalcode (20xxx or 21xxxx) is found in address, it must be dropped out (space + 5 numbers = 6 char)
-                            if " 2" in event_address[1]:
-                                event_address[1] = event_address[1][6:]
+                            if place_id:                                      
 
-                            event_address_data = event_address[0] + event_address[1]
-                            event_address_data = event_address_data.replace(' ', '_')            
-                            event_address_data = event_address_data.replace('k.', 'katu')
+                                event_address_data = addressId + "_turku"
+                                isAddressFound = True
+                                break 
 
-                            if event_address_data[0] == '_':
-                                event_address_data = event_address_data[1:]
+                        addressId = addressId + '_'  
 
-                           
-
-                            #itäinen_pitkäkatu_64_a_1_turku
-
-                           
-                            #Check the locality of the address (turku)
-
-                            addressIdParts = event_address_data.split('_')
-                            addressId = 'osoite:'
-                            isAddressFound = False
-
-                            for p in addressIdParts: 
-                                
-                                place_id = None
-
-                                addressId = (addressId + p) 
-                                                  
-                                try:
-
-                                    place_id = Place.objects.get(id=addressId+"_turku")
-                                
-                                except:
-                                    #NOTE! Save this in log file 
-                                    logger.info('No matchs for address: ')
-                                
-
-                                if place_id:                                      
-
-                                    event_address_data = addressId + "_turku"
-                                    isAddressFound = True
-                                    break 
-
-                                addressId = addressId + '_'   
-
+                        
+                        addressId = 'osoite:'
                             
-                            addressId = 'osoite:'
+                        if not isAddressFound:
                             
-                            if not isAddressFound:
-                               
-                                time.sleep(3)
-                                logger.info("-> IMPORTANT!!: Please add this address to the event_place database table: "+ event_address_data)
-                                return
+                            time.sleep(3)
+                            logger.info("-> IMPORTANT!!: Please add this address to the event_place database table: "+ event_address_data)
+                            return
 
-                            event_place_id = event_address_data
+                        event_place_id = event_address_data
 
                             
-                            eventItem['location']['id'] = event_place_id
+                        eventItem['location']['id'] = event_place_id
 
-                        else:
+                        '''
                             logger.warning("No match found for place '%s' (event %s, %s)" % (eventTku['address'],
                                                                         eventTku['drupal_nid'], eventTku['title_fi']))    
                             
                             logger.info("No address found for event with ID: " + str(eventTku['drupal_nid']) + ", " + eventTku['title_fi'] +  ",(" + str(eventTku['address']) + ")")
-          
+                        '''
+
             # Add a default offer
             free_offer = {
                 'is_free': True,
@@ -815,6 +878,18 @@ class TurkuOriginalImporter(Importer):
                 'description': None,
                 'info_url': None,
             }
+
+            '''
+            # Add a default eventlink
+            # NOTE! EI TÄÄ ONNISTU NÄIN, KOSKA TÄNNE TAULUUN PITÄÄ KIRJOITTAA USEITA RIVIÄ YHTÄ EVENTTIÄ KOHDEN. 
+            eventlink = {
+                'name': None,
+                'link': None,
+                'event_id': None,
+                'language_id':None,
+            }
+
+           '''
 
             eventOffer_is_free = str(eventTku['free_event'])
             
@@ -924,9 +999,11 @@ class TurkuOriginalImporter(Importer):
         #all children event must find their mothers 
         for json_event in json_root_event:
             json_event = json_event['event']
+            if json_event['event_image_ext_url']:
+                event_image_url = json_event['event_image_ext_url']['src']          
             eventTku = self._get_eventTku(json_event)
             if eventTku['event_type'] == "Recurring event (in series)":
-                motherFound = self._import_child_event(lang, eventTku)
+                motherFound = self._import_child_event(lang, eventTku, event_image_url)
                
         now = datetime.now().replace(tzinfo=LOCAL_TZ)
     
@@ -952,12 +1029,12 @@ class TurkuOriginalImporter(Importer):
         event_list = sorted(events.values(), key=lambda x: x['end_time'])
 
         #This set all deleted event's 'deleted' -fields values from True to False if time window is relevant
-        #qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku')
-        #self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=set_deleted_false)
+        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku')
+        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=set_deleted_false)
         
         #Normal usage (if event is deleted this is not checked in)
-        qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
-        self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted, check_deleted_func=check_deleted)
+        #qs = Event.objects.filter(end_time__gte=datetime.now(), data_source='turku', deleted=False)
+        #self.syncher = ModelSyncher(qs, lambda obj: obj.origin_id, delete_func=mark_deleted, check_deleted_func=check_deleted)
         
 
         for event in event_list:
@@ -983,7 +1060,7 @@ class TurkuOriginalImporter(Importer):
 
         '''    
         print('-------Note! if unknown tpr:unit the event has not saved and that error is written to info logger!-') 
-        print('----------Chek table: Event: Keyword, DataSource, Place, License, Image------------------------')
+        print('----------Chek table: Event: Keyword, DataSource, Place, License, Image, Offer---------------------')
         print('----------Chek midle tables: eventlink, Event-in-Language, Event-Keyword, Event-License,-------')
         print('----------Chek tables foreingkeys: Event_Place_id  Image_License id jne...---------------------')        
         '''
